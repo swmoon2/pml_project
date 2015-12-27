@@ -1,0 +1,90 @@
+---
+title: "Practical Machine Learning Project - Writeup"
+author: "Sungwook Moon"
+date: "2015년 12월 27일"
+output: html_document
+---
+
+### Project Background
+In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+### Data 
+- The training data: https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+- The test data: https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+```{r loaddata,cache=TRUE,results='hold'}
+library(caret)
+library(rpart) 
+library(rpart.plot)
+library(randomForest)
+set.seed(3323)
+
+## data loading
+temporaryFile <- tempfile()
+download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv",destfile=temporaryFile, method="curl")
+trainingset <- read.csv(temporaryFile, na.strings=c("NA", "#DIV/0!", ""))
+
+download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv",destfile=temporaryFile, method="curl")
+testingset <- read.csv(temporaryFile, na.strings=c("NA", "#DIV/0!", ""))
+## cleansing data
+trainingset<-trainingset[,colSums(is.na(trainingset)) == 0]
+testingset <-testingset[,colSums(is.na(testingset)) == 0]
+## remove irrelevant variables
+trainingset   <-trainingset[,-c(1:7)]
+testingset <-testingset[,-c(1:7)]
+```
+
+## Data Analysis
+### Output variable
+The classe represent output variable for the model which was obtained from  articipants were asked to perform one set of 10 repetitions of the Unilateral Dumbbell Biceps Curl in five different fashions as follows;
+
+- Class A: exactly according to the specification
+- Class B: throwing the elbows to the front
+- Class C: lifting the dumbbell only halfway
+- Class D: lowering the dumbbell only halfway
+- Class E: throwing the hips to the front
+
+Class A corresponds to the specified execution of the exercise, while the other 4 classes correspond to common mistakes.
+
+For the cross-validation, I partitioned the dataset.
+```{r partitioning}
+partdataset <- createDataPartition(y=trainingset$classe, p=0.75, list=FALSE)
+subTraining <- trainingset[partdataset, ] 
+subTesting <- trainingset[-partdataset, ]
+```
+
+To check the frequency level of each class, I plot the subTrainging dataset.
+```{r plotclasse}
+plot(subTraining$classe, main="Levels of the classe in the subTraining dataset", xlab="Classe Level", ylab="Frequency")
+```
+
+## Modeling and Analysis
+First, building a prediction model using subTraining dataset and decision tree method.
+```{r buildpredicmodelwithdecisiontree}
+model1 <- rpart(classe ~ ., data=subTraining, method="class")
+prediction1 <- predict(model1, subTesting, type = "class")
+```
+
+With subTesting dataset, test the prediction model.
+```{r test1}
+confusionMatrix(prediction1, subTesting$classe)
+```
+
+Next, buidling a prediction model using random forest method.
+```{r buildpredicmodelwithrandomforest}
+model2 <- randomForest(classe ~. , data=subTraining, method="class")
+prediction2 <- predict(model2, subTesting, type = "class")
+```
+
+With subTesting dataset, test the prediction model.
+```{r test2}
+confusionMatrix(prediction2, subTesting$classe)
+```
+
+### Select Prediction Model
+The comparison of the accuracy of two prediction models showed that the random forest method performed better. So I selected it.
+
+## References
+[1] Ugulino, W.; Cardador, D.; Vega, K.; Velloso, E.; Milidiu, R.; Fuks, H. Wearable Computing: Accelerometers' Data Classification of Body Postures and Movements. Proceedings of 21st Brazilian Symposium on Artificial Intelligence. Advances in Artificial Intelligence - SBIA 2012. In: Lecture Notes in Computer Science. , pp. 52-61. Curitiba, PR: Springer Berlin / Heidelberg, 2012. ISBN 978-3-642-34458-9. DOI: 10.1007/978-3-642-34459-6_6. 
+
+[2] Velloso, E.; Bulling, A.; Gellersen, H.; Ugulino, W.; Fuks, H. Qualitative Activity Recognition of Weight Lifting Exercises. Proceedings of 4th International Conference in Cooperation with SIGCHI (Augmented Human '13) . Stuttgart, Germany: ACM SIGCHI, 2013.
